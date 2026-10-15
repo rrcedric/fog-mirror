@@ -82,3 +82,7 @@ Le workflow `.github/workflows/deploy.yml` vérifie les types, le lint et les te
 - [MediaPipe Tasks Vision](https://github.com/google-ai-edge/mediapipe) et ses modèles Face Landmarker et Hand Landmarker (Google, Apache 2.0).
 - [Svelte](https://svelte.dev), [Vite](https://vite.dev), [Tweakpane](https://tweakpane.github.io/docs/) (MIT).
 - Filtre One Euro : Casiez, Roussel et Vogel, CHI 2012. Flou dual Kawase : Marius Bjørge, SIGGRAPH 2015.
+
+## Licence
+
+Code sous licence [MIT](LICENSE). Les modèles MediaPipe (`public/models/`) restent sous leur propre licence (Apache 2.0).
