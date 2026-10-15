@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Confidentialité · Fog Mirror</title>
+    <meta name="description" content="Ce que Fog Mirror fait (et ne fait pas) de votre image." />
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+    <style>
+      :root {
+        --bg: #0b0d10;
+        --fg: #eef1f4;
+        --muted: #9aa3ad;
+        --card: rgb(255 255 255 / 0.06);
+        --card-border: rgb(255 255 255 / 0.12);
+        --accent: #dfe8ef;
+
+        color-scheme: dark;
+        font-family:
+          system-ui,
+          -apple-system,
+          'Segoe UI',
+          Roboto,
+          sans-serif;
+        color: var(--fg);
+        background: var(--bg);
+        -webkit-font-smoothing: antialiased;
+      }
+
+      body {
+        margin: 0;
+        padding: 48px 16px 64px;
+        background:
+          radial-gradient(ellipse at 50% 0%, rgb(255 255 255 / 0.07), transparent 60%), var(--bg);
+        line-height: 1.6;
+      }
+
+      main {
+        max-width: 680px;
+        margin: 0 auto;
+      }
+
+      a {
+        color: var(--accent);
+      }
+
+      .back {
+        display: inline-block;
+        margin-bottom: 32px;
+        color: var(--muted);
+        text-decoration: none;
+      }
+
+      .back:hover {
+        color: var(--fg);
+      }
+
+      h1 {
+        margin: 0 0 8px;
+        font-size: 2rem;
+        letter-spacing: -0.02em;
+      }
+
+      .lead {
+        margin: 0 0 32px;
+        font-size: 1.1rem;
+        color: var(--muted);
+      }
+
+      .summary {
+        margin: 0 0 40px;
+        padding: 20px 24px;
+        border: 1px solid var(--card-border);
+        border-radius: 16px;
+        background: var(--card);
+      }
+
+      .summary ul {
+        margin: 0;
+        padding-left: 20px;
+      }
+
+      h2 {
+        margin: 36px 0 8px;
+        font-size: 1.15rem;
+      }
+
+      p,
+      li {
+        color: var(--fg);
+      }
+
+      .updated {
+        margin-top: 48px;
+        font-size: 0.875rem;
+        color: var(--muted);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <a class="back" href="./">← Retour au miroir</a>
+      <h1>Confidentialité</h1>
+      <p class="lead">Fog Mirror fonctionne entièrement dans votre navigateur.</p>
+
+      <section class="summary" aria-label="En bref">
+        <ul>
+          <li>L’image de votre caméra ne quitte jamais votre appareil.</li>
+          <li>Rien n’est enregistré, sauf si vous enregistrez vous-même une image.</li>
+          <li>Pas de compte, pas de cookie, pas de mesure d’audience, pas de publicité.</li>
+        </ul>
+      </section>
+
+      <h2>La caméra</h2>
+      <p>
+        Fog Mirror demande l’accès à votre caméra pour afficher votre reflet et repérer votre bouche
+        et votre main. Ce traitement est fait par votre navigateur, sur votre appareil, avec
+        MediaPipe, une bibliothèque de Google. Aucune image ni aucune donnée tirée de l’image
+        (position du visage, de la main…) n’est envoyée sur internet.
+      </p>
+      <p>
+        Le micro n’est pas utilisé. Vous pouvez retirer l’accès à la caméra à tout moment dans les
+        réglages du site de votre navigateur ; fermer la page l’arrête aussi.
+      </p>
+
+      <h2>Les images enregistrées</h2>
+      <p>
+        Le bouton « Enregistrer une image » crée un fichier PNG directement sur votre appareil, dans
+        votre dossier de téléchargements. Il n’est envoyé nulle part.
+      </p>
+
+      <h2>Ce qui est mémorisé dans votre navigateur</h2>
+      <p>
+        Pour ne pas vous les redemander, Fog Mirror garde dans le stockage local de votre navigateur
+        :
+      </p>
+      <ul>
+        <li>le fait que vous avez terminé ou passé le guide d’accueil ;</li>
+        <li>vos réglages (épaisseur du trait, intensité de la buée, etc.).</li>
+      </ul>
+      <p>
+        Ces informations restent sur votre appareil. Vous pouvez les effacer en supprimant les
+        données du site dans les réglages de votre navigateur.
+      </p>
+
+      <h2>Hébergement</h2>
+      <p>
+        Le site est hébergé sur GitHub Pages. Tous les fichiers nécessaires (code, modèles de
+        détection) sont servis depuis ce même site : aucun autre service n’est contacté. Comme tout
+        hébergeur, GitHub reçoit les informations techniques de chaque visite (adresse IP,
+        navigateur) ; voir la
+        <a
+          href="https://docs.github.com/fr/site-policy/privacy-policies/github-general-privacy-statement"
+          >déclaration de confidentialité de GitHub</a
+        >.
+      </p>
+
+      <h2>Code source</h2>
+      <p>
+        Le code de Fog Mirror est public : vous pouvez vérifier tout ce qui précède sur
+        <a href="https://github.com/rrcedric/fog-mirror">github.com/rrcedric/fog-mirror</a>. Pour
+        toute question, ouvrez un ticket sur ce dépôt.
+      </p>
+
+      <p class="updated">Dernière mise à jour : 15 octobre 2026.</p>
+    </main>
+  </body>
+</html>

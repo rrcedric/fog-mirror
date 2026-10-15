@@ -37,7 +37,10 @@
     <dt><kbd>H</kbd></dt>
     <dd>Aide</dd>
   </dl>
-  <button onclick={onreplay}>Revoir le guide</button>
+  <div class="footer">
+    <button onclick={onreplay}>Revoir le guide</button>
+    <a href="./confidentialite.html" target="_blank" rel="noopener">Confidentialité</a>
+  </div>
 </section>
 
 <style>
@@ -75,6 +78,18 @@
     font: inherit;
     font-size: 0.8rem;
     text-align: center;
+  }
+
+  .footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  a {
+    color: var(--muted);
+    font-size: 0.875rem;
   }
 
   button {

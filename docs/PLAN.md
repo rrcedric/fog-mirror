@@ -2,6 +2,24 @@
 
 Application web qui transforme l'écran en miroir embué : la webcam affiche le reflet de l'utilisateur, son souffle crée de la buée là où se trouve sa bouche, et il peut dessiner dans la buée avec le doigt (en l'air, suivi par la caméra) ou à la souris.
 
+## État
+
+**v1 publiée le 15 octobre 2026** : https://rrcedric.github.io/fog-mirror/
+
+| Jalon                       | État                                                                          |
+| --------------------------- | ----------------------------------------------------------------------------- |
+| J0 — Mise en place          | Fait                                                                          |
+| J1 — Le miroir              | Fait                                                                          |
+| J2 — Moteur de buée v1      | Fait                                                                          |
+| J3 — Détection de la bouche | Fait                                                                          |
+| J4 — Souffle au micro       | Abandonné (le souffle repose sur la forme de la bouche)                       |
+| J5 — Doigt en l'air         | Fait, avec tracé organique                                                    |
+| J6 — Réalisme               | Fait : ré-embuage des tracés, gouttes qui coulent, forme organique du souffle |
+| J7 — Expérience et finition | Fait (testé sur Chrome et Safari)                                             |
+| J8 — Publication            | Fait                                                                          |
+
+Le reste de ce document est le plan initial, mis à jour au fil des décisions.
+
 ## Choix retenus
 
 | Sujet                  | Décision                                                                                          |
