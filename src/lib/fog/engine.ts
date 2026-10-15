@@ -4,6 +4,7 @@ import { FpsMeter } from '../perf/fps'
 import { BlurPyramid } from './blur'
 import { DripSystem, MAX_DRIPS } from './drips'
 import { FogField, type FieldFormat } from './field'
+import { FieldProbe } from './probe'
 import { createProgram, createVideoTexture, resolveIncludes, uniformLocations } from './gl'
 import { strokeWidth, type FogParams } from './params'
 import compositeFrag from './passes/composite.frag?raw'
@@ -105,6 +106,9 @@ export class MirrorEngine {
   private readonly field: FogField
   private readonly blur: BlurPyramid
   private readonly drips: DripSystem
+  private readonly probe: FieldProbe
+  /** Temps restant avant la prochaine relecture du champ par la sonde, en secondes. */
+  private probeTimer = 0
   private readonly dripData = new Float32Array(MAX_DRIPS * 4)
   private quality: Quality = { pixelRatio: 2, fieldScale: 1 }
   private wipeRemaining = 0
@@ -143,6 +147,7 @@ export class MirrorEngine {
     this.field = new FogField(gl, options.fieldFormat)
     this.blur = new BlurPyramid(gl)
     this.drips = new DripSystem(params)
+    this.probe = new FieldProbe(gl)
 
     this.resizeObserver = new ResizeObserver(() => this.resize())
     this.resizeObserver.observe(canvas)
@@ -175,6 +180,7 @@ export class MirrorEngine {
     this.resizeObserver.disconnect()
     this.field.dispose()
     this.blur.dispose()
+    this.probe.dispose()
     this.gl.deleteTexture(this.videoTexture)
     this.gl.deleteProgram(this.updateProgram)
     this.gl.deleteProgram(this.compositeProgram)
@@ -272,7 +278,13 @@ export class MirrorEngine {
     // des tracés et des souffles de la frame.
     this.drips.update(dt, this.input)
     const { breaths, segments } = this.input.drain()
-    this.drips.observe(segments, breaths, dt)
+    // Où y a-t-il de la buée ? Relu quelques fois par seconde (relecture GPU → CPU coûteuse).
+    this.probeTimer -= dt
+    if (this.probeTimer <= 0) {
+      this.probe.update(this.field)
+      this.probeTimer = 0.3
+    }
+    this.drips.observe(segments, breaths, dt, (x, y) => this.probe.densityAt(x, y))
     this.breathData.fill(0)
     breaths.slice(0, MAX_BREATHS).forEach((b, i) => {
       this.breathData.set([b.x, b.y, params.breathRadius * (b.scale ?? 1), b.intensity], i * 4)

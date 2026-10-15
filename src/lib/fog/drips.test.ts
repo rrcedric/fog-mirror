@@ -93,6 +93,40 @@ describe('DripSystem', () => {
     expect(drips.count).toBeGreaterThan(0)
   })
 
+  it('does not form drips from a stroke on a clear mirror', () => {
+    const drips = new DripSystem(PARAMS, seeded())
+    drips.observe(stroke(1), [], 1 / 60, () => 0)
+    run(drips, new InputBus(), 3)
+    expect(drips.count).toBe(0)
+  })
+
+  it('forms fewer drips where the fog is thin', () => {
+    const count = (density: number) => {
+      const drips = new DripSystem(PARAMS, seeded())
+      // Un trait d'un écran de long, en 50 petits segments comme un vrai geste.
+      const segments: Segment[] = Array.from({ length: 50 }, (_, i) => ({
+        a: { x: i * 0.02, y: 0.4, speed: 0 },
+        b: { x: (i + 1) * 0.02, y: 0.4, speed: 0 },
+        source: 'hand',
+      }))
+      drips.observe(segments, [], 1 / 60, () => density)
+      run(drips, new InputBus(), 3)
+      return drips.count
+    }
+    expect(count(0.3)).toBeLessThan(count(1))
+  })
+
+  it('does not form drips under a breath until the fog is thick', () => {
+    const drips = new DripSystem(PARAMS, seeded())
+    const bus = new InputBus()
+    for (let t = 0; t < 10; t += 1 / 60) {
+      drips.observe([], [{ x: 0.5, y: 0.4, intensity: 1 }], 1 / 60, () => 0.3)
+      drips.update(1 / 60, bus)
+      bus.drain()
+    }
+    expect(drips.count).toBe(0)
+  })
+
   it('is disabled when the rate is 0', () => {
     const drips = new DripSystem({ ...PARAMS, dripRate: 0 }, seeded())
     drips.observe(stroke(1), [{ x: 0.5, y: 0.4, intensity: 1 }], 10)

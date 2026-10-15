@@ -30,6 +30,11 @@ interface Drip {
   radius: number
 }
 
+const smoothstep = (a: number, b: number, x: number) => {
+  const t = Math.min(Math.max((x - a) / (b - a), 0), 1)
+  return t * t * (3 - 2 * t)
+}
+
 interface Pending extends Point {
   at: number
 }
@@ -54,16 +59,28 @@ export class DripSystem {
     private readonly random: () => number = Math.random,
   ) {}
 
-  /** Prend en compte les tracés et souffles de la frame pour faire naître des gouttes. */
-  observe(segments: Segment[], breaths: Breath[], dt: number): void {
+  /**
+   * Prend en compte les tracés et souffles de la frame pour faire naître des gouttes.
+   * `densityAt` donne la buée visible (0..1) en un point de l'écran : un tracé sur un miroir net
+   * ne repousse pas d'eau, il ne fait donc pas couler de gouttes.
+   */
+  observe(
+    segments: Segment[],
+    breaths: Breath[],
+    dt: number,
+    densityAt: (x: number, y: number) => number = () => 1,
+  ): void {
     const p = this.params
     if (p.dripRate <= 0) return
     for (const s of segments) {
       if (s.source.startsWith(SOURCE_PREFIX)) continue
-      // L'eau repoussée s'accumule surtout sous les portions horizontales du tracé.
+      // L'eau repoussée s'accumule surtout sous les portions horizontales du tracé, et d'autant
+      // plus que la buée y était épaisse.
+      const water = smoothstep(0.15, 0.6, densityAt(s.b.x, s.b.y))
+      if (water <= 0) continue
       const dx = Math.abs(s.b.x - s.a.x)
       const dy = Math.abs(s.b.y - s.a.y)
-      this.strokeWater += (dx + 0.3 * dy) * p.dripRate
+      this.strokeWater += (dx + 0.3 * dy) * p.dripRate * water
       if (this.strokeWater >= 1) {
         this.strokeWater -= 1 + this.random()
         // La goutte se forme sous le tracé, un peu plus tard.
@@ -71,6 +88,8 @@ export class DripSystem {
       }
     }
     for (const b of breaths) {
+      // Seule une buée épaisse (souffle prolongé) finit par couler.
+      if (densityAt(b.x, b.y) < 0.6) continue
       if (this.random() < 0.3 * p.dripRate * b.intensity * dt) {
         const r = p.breathRadius * (b.scale ?? 1)
         this.schedule(
