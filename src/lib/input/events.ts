@@ -7,10 +7,16 @@ export interface Breath extends Point {
   scale?: number
 }
 
-/** Segment de trace de doigt, en coordonnées écran normalisées. */
+/** Point d'une trace de doigt, en coordonnées écran normalisées. */
+export interface StrokePoint extends Point {
+  /** Vitesse du doigt en écrans par seconde (0 si inconnue) : un doigt rapide trace plus fin. */
+  speed: number
+}
+
+/** Segment de trace de doigt. */
 export interface Segment {
-  a: Point
-  b: Point
+  a: StrokePoint
+  b: StrokePoint
 }
 
 export interface FrameInput {
@@ -27,7 +33,7 @@ export interface FrameInput {
  */
 export class InputBus {
   private readonly breaths = new Map<string, Breath>()
-  private readonly lastPoints = new Map<string, Point>()
+  private readonly lastPoints = new Map<string, StrokePoint>()
   private segments: Segment[] = []
 
   setBreath(source: string, breath: Breath | null): void {
@@ -35,10 +41,11 @@ export class InputBus {
     else this.breaths.delete(source)
   }
 
-  strokeTo(source: string, point: Point): void {
-    const last = this.lastPoints.get(source) ?? point
-    this.segments.push({ a: { ...last }, b: { ...point } })
-    this.lastPoints.set(source, { ...point })
+  strokeTo(source: string, point: Point & { speed?: number }): void {
+    const next: StrokePoint = { x: point.x, y: point.y, speed: point.speed ?? 0 }
+    const last = this.lastPoints.get(source) ?? next
+    this.segments.push({ a: { ...last }, b: next })
+    this.lastPoints.set(source, next)
   }
 
   strokeEnd(source: string): void {

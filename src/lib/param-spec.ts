@@ -10,3 +10,19 @@ export interface ParamSpec<T> {
   step: number
   folder: string
 }
+
+/** Un objet de paramètres réglable dans le panneau, avec ses valeurs par défaut. */
+export interface ParamGroup<T extends object> {
+  target: T
+  specs: ParamSpec<T>[]
+  defaults: T
+}
+
+/** Construit un groupe en vérifiant les types, puis l'efface pour le stocker dans une liste. */
+export function paramGroup<T extends object>(
+  target: T,
+  specs: ParamSpec<T>[],
+  defaults: T,
+): ParamGroup<object> {
+  return { target, specs, defaults } as unknown as ParamGroup<object>
+}

@@ -1,17 +1,37 @@
 <script lang="ts">
   import type { EngineStats } from '../lib/fog/engine'
   import type { FaceBreathDebug } from '../lib/input/face-breath'
+  import type { HandStrokeDebug } from '../lib/input/hand-stroke'
   import type { BreathShapeParams } from '../lib/tracking/breath-shape'
-  import type { FaceStatus } from './face-status'
+  import type { PointingParams } from '../lib/tracking/gesture'
+  import type { TaskStats } from '../lib/tracking/scheduler'
+  import type { TrackerStatus } from './tracking-status'
 
   interface Props {
     stats: EngineStats | null
-    faceStatus: FaceStatus
+    faceStatus: TrackerStatus
     faceDebug: FaceBreathDebug | null
     faceParams: BreathShapeParams
+    handStatus: TrackerStatus
+    handDebug: HandStrokeDebug | null
+    pointingParams: PointingParams
+    /** Fréquence et durée réelles des inférences, mesurées par l'ordonnanceur. */
+    taskStats: { face: TaskStats | null; hand: TaskStats | null }
   }
 
-  let { stats, faceStatus, faceDebug, faceParams }: Props = $props()
+  let {
+    stats,
+    faceStatus,
+    faceDebug,
+    faceParams,
+    handStatus,
+    handDebug,
+    pointingParams,
+    taskStats,
+  }: Props = $props()
+
+  const rate = (t: TaskStats | null) =>
+    t ? `${t.rate.toFixed(0)} fps · ${t.avgMs.toFixed(1)} ms` : '—'
 
   // Les jauges vont de 0 à 1 ; le score peut dépasser 1.
   const pct = (v: number) => `${Math.min(Math.max(v, 0), 1) * 100}%`
@@ -33,9 +53,7 @@
     <div>
       visage <b>{faceDebug.face ? 'détecté' : 'absent'}</b> · {faceStatus.delegate}
     </div>
-    <div>
-      détection <b>{faceDebug.detectFps.toFixed(0)}</b> fps · {faceDebug.inferenceMs.toFixed(1)} ms
-    </div>
+    <div>détection <b>{rate(taskStats.face)}</b></div>
     <div class="gauge" title="Score de forme de souffle">
       <span
         class="fill"
@@ -62,6 +80,29 @@
     <div>visage <b>indisponible</b></div>
   {:else}
     <div>visage : chargement…</div>
+  {/if}
+  <hr />
+  {#if handStatus.name === 'ready' && handDebug}
+    <div>
+      main <b>{handDebug.landmarks ? 'détectée' : 'absente'}</b> · {handStatus.delegate}
+    </div>
+    <div>détection <b>{rate(taskStats.hand)}</b></div>
+    {#if handDebug.pose}
+      {@const p = handDebug.pose}
+      <div>
+        écrit <b>{handDebug.drawing ? 'oui' : 'non'}</b> · index {p.index.toFixed(2)}
+        <span class="muted">(≥ {pointingParams.indexOn})</span>
+      </div>
+      <div class="muted">
+        majeur {p.middle.toFixed(2)} · annulaire {p.ring.toFixed(2)} · auriculaire {p.pinky.toFixed(
+          2,
+        )} (≤ {pointingParams.othersOn})
+      </div>
+    {/if}
+  {:else if handStatus.name === 'error'}
+    <div>main <b>indisponible</b></div>
+  {:else}
+    <div>main : chargement…</div>
   {/if}
   <div class="hint">D : masquer les réglages</div>
 </aside>

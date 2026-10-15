@@ -1,42 +1,18 @@
 <script lang="ts">
   import { onMount } from 'svelte'
-  import type { FolderApi, Pane } from 'tweakpane'
-  import { FOG_PARAM_SPECS, resetParams, type FogParams } from '../lib/fog/params'
-  import type { ParamSpec } from '../lib/param-spec'
-  import {
-    BREATH_SHAPE_PARAM_SPECS,
-    DEFAULT_BREATH_SHAPE_PARAMS,
-    type BreathShapeParams,
-  } from '../lib/tracking/breath-shape'
+  import type { FolderApi } from 'tweakpane'
+  import type { FogParams } from '../lib/fog/params'
+  import type { ParamGroup } from '../lib/param-spec'
 
   interface Props {
+    /** Paramètres de la buée : leur couleur a un contrôle à part. */
     fog: FogParams
-    face: BreathShapeParams
+    groups: ParamGroup<object>[]
     onfill: (density: number) => void
   }
 
-  let { fog, face, onfill }: Props = $props()
+  let { fog, groups, onfill }: Props = $props()
   let container: HTMLDivElement
-
-  function addBindings<T extends object>(
-    pane: Pane,
-    folders: Record<string, FolderApi>,
-    target: T,
-    specs: ParamSpec<T>[],
-  ) {
-    for (const spec of specs) {
-      const folder = (folders[spec.folder] ??= pane.addFolder({ title: spec.folder }))
-      folder.addBinding(target, spec.key, {
-        label: spec.label,
-        min: spec.min,
-        max: spec.max,
-        step: spec.step,
-      })
-      if (target === fog && spec.key === 'veilOpacity') {
-        folder.addBinding(fog, 'fogColor', { label: 'couleur', color: { type: 'float' } })
-      }
-    }
-  }
 
   onMount(() => {
     let disposed = false
@@ -52,17 +28,29 @@
       actions.addButton({ title: 'Tout embuer' }).on('click', () => onfill(1))
       actions.addButton({ title: 'Tout effacer' }).on('click', () => onfill(0))
       actions.addButton({ title: 'Valeurs par défaut' }).on('click', () => {
-        resetParams(fog)
-        Object.assign(face, DEFAULT_BREATH_SHAPE_PARAMS)
+        for (const g of groups) Object.assign(g.target, structuredClone(g.defaults))
         pane.refresh()
       })
       actions.addButton({ title: 'Copier les réglages (JSON)' }).on('click', () => {
-        navigator.clipboard?.writeText(JSON.stringify({ fog, face }, null, 2))
+        const all = Object.assign({}, ...groups.map((g) => g.target))
+        navigator.clipboard?.writeText(JSON.stringify(all, null, 2))
       })
 
       const folders: Record<string, FolderApi> = {}
-      addBindings(pane, folders, face, BREATH_SHAPE_PARAM_SPECS)
-      addBindings(pane, folders, fog, FOG_PARAM_SPECS)
+      for (const { target, specs } of groups) {
+        for (const spec of specs) {
+          const folder = (folders[spec.folder] ??= pane.addFolder({ title: spec.folder }))
+          folder.addBinding(target, spec.key as keyof typeof target, {
+            label: spec.label,
+            min: spec.min,
+            max: spec.max,
+            step: spec.step,
+          })
+          if (target === fog && spec.key === 'veilOpacity') {
+            folder.addBinding(fog, 'fogColor', { label: 'couleur', color: { type: 'float' } })
+          }
+        }
+      }
     })
 
     return () => {

@@ -23,6 +23,14 @@ export interface FogParams {
   strokeRadius: number
   /** Part de la buée retirée au centre du trait (1 = miroir parfaitement net). */
   strokeStrength: number
+  /** Irrégularité du bord du trait (0 = bord parfaitement lisse). */
+  strokeEdgeNoise: number
+  /** Buée laissée en fines stries dans le trait (0 = essuyage net). */
+  strokeStreaks: number
+  /** Buée repoussée en bourrelet sur les bords du trait quand le doigt avance. */
+  strokeRim: number
+  /** Amincissement du trait quand le doigt va vite (0 = largeur constante). */
+  strokeThinning: number
   /** Évaporation proportionnelle à la densité (par seconde). */
   evaporation: number
   /** Évaporation constante (par seconde), pour que la buée finisse par disparaître. */
@@ -40,8 +48,12 @@ export const DEFAULT_PARAMS: FogParams = {
   breathRadius: 0.2,
   breathRate: 3,
   breathSpread: 2,
-  strokeRadius: 0.022,
+  strokeRadius: 0.035,
   strokeStrength: 0.95,
+  strokeEdgeNoise: 0.45,
+  strokeStreaks: 0.35,
+  strokeRim: 0.3,
+  strokeThinning: 0.35,
   evaporation: 0.06,
   evaporationFloor: 0.012,
   evaporationVariation: 0.6,
@@ -66,6 +78,17 @@ export const FOG_PARAM_SPECS: ParamSpec<FogParams>[] = [
   { folder: 'Souffle', key: 'breathSpread', label: 'étalement', min: 1, max: 4, step: 0.1 },
   { folder: 'Doigt', key: 'strokeRadius', label: 'épaisseur', min: 0.005, max: 0.08, step: 0.001 },
   { folder: 'Doigt', key: 'strokeStrength', label: 'netteté', min: 0, max: 1, step: 0.01 },
+  { folder: 'Doigt', key: 'strokeEdgeNoise', label: 'bord irrégulier', min: 0, max: 1, step: 0.01 },
+  { folder: 'Doigt', key: 'strokeStreaks', label: 'stries', min: 0, max: 1, step: 0.01 },
+  { folder: 'Doigt', key: 'strokeRim', label: 'bourrelet', min: 0, max: 1, step: 0.01 },
+  {
+    folder: 'Doigt',
+    key: 'strokeThinning',
+    label: 'finesse si rapide',
+    min: 0,
+    max: 0.8,
+    step: 0.01,
+  },
   {
     folder: 'Évaporation',
     key: 'evaporation',
@@ -102,3 +125,9 @@ export const FOG_PARAM_SPECS: ParamSpec<FogParams>[] = [
   { folder: 'Rendu', key: 'blurRadius', label: 'flou', min: 0, max: 0.1, step: 0.001 },
   { folder: 'Rendu', key: 'veilOpacity', label: 'voile', min: 0, max: 1, step: 0.01 },
 ]
+
+/** Facteur de largeur du trait selon la vitesse du doigt (écrans par seconde). */
+export function strokeWidth(speed: number, params: Pick<FogParams, 'strokeThinning'>): number {
+  const t = Math.min(Math.max((speed - 0.15) / (1.5 - 0.15), 0), 1)
+  return 1 - params.strokeThinning * t * t * (3 - 2 * t)
+}

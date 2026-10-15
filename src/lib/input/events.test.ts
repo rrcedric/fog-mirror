@@ -22,7 +22,7 @@ describe('InputBus', () => {
     bus.strokeTo('mouse', { x: 0, y: 0 })
     bus.strokeTo('mouse', { x: 1, y: 0 })
     bus.strokeTo('mouse', { x: 1, y: 1 })
-    expect(bus.drain().segments).toEqual([
+    expect(bus.drain().segments).toMatchObject([
       { a: { x: 0, y: 0 }, b: { x: 0, y: 0 } },
       { a: { x: 0, y: 0 }, b: { x: 1, y: 0 } },
       { a: { x: 1, y: 0 }, b: { x: 1, y: 1 } },
@@ -36,7 +36,7 @@ describe('InputBus', () => {
     expect(bus.drain().segments).toHaveLength(0)
     bus.strokeEnd('mouse')
     bus.strokeTo('mouse', { x: 0.5, y: 0.5 })
-    expect(bus.drain().segments).toEqual([{ a: { x: 0.5, y: 0.5 }, b: { x: 0.5, y: 0.5 } }])
+    expect(bus.drain().segments).toMatchObject([{ a: { x: 0.5, y: 0.5 }, b: { x: 0.5, y: 0.5 } }])
   })
 
   it('keeps sources independent', () => {
@@ -45,6 +45,15 @@ describe('InputBus', () => {
     bus.strokeTo('hand', { x: 1, y: 1 })
     bus.strokeTo('mouse', { x: 0.1, y: 0 })
     const { segments } = bus.drain()
-    expect(segments[2]).toEqual({ a: { x: 0, y: 0 }, b: { x: 0.1, y: 0 } })
+    expect(segments[2]).toMatchObject({ a: { x: 0, y: 0 }, b: { x: 0.1, y: 0 } })
+  })
+
+  it('carries the finger speed, 0 by default', () => {
+    const bus = new InputBus()
+    bus.strokeTo('hand', { x: 0, y: 0, speed: 0.4 })
+    bus.strokeTo('mouse', { x: 0, y: 0 })
+    const [hand, mouse] = bus.drain().segments
+    expect(hand.b.speed).toBe(0.4)
+    expect(mouse.b.speed).toBe(0)
   })
 })

@@ -1,6 +1,7 @@
-import { FaceLandmarker, FilesetResolver, type Category } from '@mediapipe/tasks-vision'
+import { FaceLandmarker, type Category } from '@mediapipe/tasks-vision'
 import type { Point } from '../coords'
 import type { MouthShape } from './breath-shape'
+import { assetUrl, createWithFallback, MonotonicClock, type Delegate } from './mediapipe'
 
 /** Ce qu'on retient d'un visage détecté. Coordonnées vidéo normalisées (voir coords.ts). */
 export interface FaceObservation {
@@ -21,49 +22,34 @@ const INNER_LIPS = [
   78, 191, 80, 81, 82, 13, 312, 311, 310, 415, 308, 324, 318, 402, 317, 14, 87, 178, 88, 95,
 ]
 
-function assetUrl(path: string): string {
-  return new URL(import.meta.env.BASE_URL + path, location.href).href
-}
-
 function blendshape(categories: Category[], name: string): number {
   return categories.find((c) => c.categoryName === name)?.score ?? 0
 }
 
 /** Détection du visage et de la bouche avec MediaPipe Face Landmarker, entièrement locale. */
 export class FaceTracker {
-  private lastTimestamp = 0
+  private readonly clock = new MonotonicClock()
 
   private constructor(
     private readonly landmarker: FaceLandmarker,
-    readonly delegate: 'GPU' | 'CPU',
+    readonly delegate: Delegate,
   ) {}
 
   /** Charge le modèle, sur GPU si possible, sinon sur CPU. */
   static async create(): Promise<FaceTracker> {
-    const fileset = await FilesetResolver.forVisionTasks(assetUrl('mediapipe/wasm'))
-    let lastError: unknown
-    for (const delegate of ['GPU', 'CPU'] as const) {
-      try {
-        const landmarker = await FaceLandmarker.createFromOptions(fileset, {
-          baseOptions: { modelAssetPath: assetUrl('models/face_landmarker.task'), delegate },
-          runningMode: 'VIDEO',
-          numFaces: 1,
-          outputFaceBlendshapes: true,
-        })
-        return new FaceTracker(landmarker, delegate)
-      } catch (err) {
-        console.warn(`FaceLandmarker (${delegate}) indisponible`, err)
-        lastError = err
-      }
-    }
-    throw lastError
+    const { task, delegate } = await createWithFallback('FaceLandmarker', (fileset, delegate) =>
+      FaceLandmarker.createFromOptions(fileset, {
+        baseOptions: { modelAssetPath: assetUrl('models/face_landmarker.task'), delegate },
+        runningMode: 'VIDEO',
+        numFaces: 1,
+        outputFaceBlendshapes: true,
+      }),
+    )
+    return new FaceTracker(task, delegate)
   }
 
   detect(video: HTMLVideoElement): FaceObservation | null {
-    // MediaPipe exige des timestamps strictement croissants.
-    const timestamp = Math.max(performance.now(), this.lastTimestamp + 1)
-    this.lastTimestamp = timestamp
-    const result = this.landmarker.detectForVideo(video, timestamp)
+    const result = this.landmarker.detectForVideo(video, this.clock.now())
     const landmarks = result.faceLandmarks[0]
     if (!landmarks) return null
 

@@ -6,6 +6,7 @@ import {
   type BreathShapeState,
 } from '../tracking/breath-shape'
 import type { FaceObservation, FaceTracker } from '../tracking/face'
+import type { TrackingTask } from '../tracking/scheduler'
 import type { InputBus } from './events'
 
 const SOURCE = 'face'
@@ -22,15 +23,14 @@ export interface FaceBreathDebug {
 }
 
 /**
- * Relie le suivi du visage au bus d'événements : à chaque nouvelle image de la caméra, détecte
- * la bouche et, si elle a une forme de souffle, émet un souffle à sa position à l'écran.
+ * Relie le suivi du visage au bus d'événements : à chaque exécution (décidée par le
+ * TrackingScheduler), détecte la bouche et, si elle a une forme de souffle, émet un souffle à sa
+ * position à l'écran.
  */
-export class FaceBreathInput {
+export class FaceBreathInput implements TrackingTask {
+  readonly name = 'face'
   private readonly detector: BreathShapeDetector
   private readonly fps = new FpsMeter()
-  private frameId = 0
-  private rafId = 0
-  private lastVideoTime = -1
   private lastTime = -1
 
   constructor(
@@ -45,34 +45,12 @@ export class FaceBreathInput {
     this.detector = new BreathShapeDetector(params)
   }
 
-  start(): void {
-    if ('requestVideoFrameCallback' in this.video) {
-      const onFrame = (now: number) => {
-        this.frameId = this.video.requestVideoFrameCallback(onFrame)
-        this.step(now)
-      }
-      this.frameId = this.video.requestVideoFrameCallback(onFrame)
-    } else {
-      // Sans rVFC : on vérifie à chaque frame d'affichage si la vidéo a avancé.
-      const loop = (now: number) => {
-        this.rafId = requestAnimationFrame(loop)
-        if (this.video.currentTime === this.lastVideoTime) return
-        this.lastVideoTime = this.video.currentTime
-        this.step(now)
-      }
-      this.rafId = requestAnimationFrame(loop)
-    }
-  }
-
-  stop(): void {
-    if (this.frameId) this.video.cancelVideoFrameCallback(this.frameId)
-    cancelAnimationFrame(this.rafId)
-    this.frameId = 0
-    this.rafId = 0
+  /** Retire le souffle en cours (à appeler à l'arrêt). */
+  dispose(): void {
     this.bus.setBreath(SOURCE, null)
   }
 
-  private step(now: number): void {
+  run(now: number): void {
     const dt = this.lastTime < 0 ? 0 : (now - this.lastTime) / 1000
     this.lastTime = now
     this.fps.tick(now)

@@ -1,5 +1,6 @@
 import type { Point } from '../coords'
 import type { InputBus } from './events'
+import { SpeedMeter } from './speed'
 
 const SOURCE = 'pointer'
 
@@ -13,6 +14,7 @@ const SOURCE = 'pointer'
 export function attachPointerInput(element: HTMLElement, bus: InputBus): () => void {
   let mode: 'breath' | 'stroke' | null = null
   let pointerId = -1
+  const speed = new SpeedMeter()
 
   const toPoint = (e: PointerEvent): Point => {
     const rect = element.getBoundingClientRect()
@@ -22,12 +24,14 @@ export function attachPointerInput(element: HTMLElement, bus: InputBus): () => v
   const apply = (e: PointerEvent) => {
     const p = toPoint(e)
     if (mode === 'breath') bus.setBreath(SOURCE, { ...p, intensity: 1 })
-    else if (mode === 'stroke') bus.strokeTo(SOURCE, p)
+    else if (mode === 'stroke')
+      bus.strokeTo(SOURCE, { ...p, speed: speed.update(p, e.timeStamp / 1000) })
   }
 
   const end = () => {
     if (mode === 'breath') bus.setBreath(SOURCE, null)
     if (mode === 'stroke') bus.strokeEnd(SOURCE)
+    speed.reset()
     mode = null
     pointerId = -1
   }

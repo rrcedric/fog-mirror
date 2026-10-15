@@ -3,7 +3,7 @@ import type { InputBus, Segment } from '../input/events'
 import { FpsMeter } from '../perf/fps'
 import { FogField, type FieldFormat } from './field'
 import { createProgram, createVideoTexture, resolveIncludes, uniformLocations } from './gl'
-import type { FogParams } from './params'
+import { strokeWidth, type FogParams } from './params'
 import compositeFrag from './passes/composite.frag?raw'
 import fullscreenVert from './passes/fullscreen.vert?raw'
 import noiseGlsl from './passes/noise.glsl?raw'
@@ -44,8 +44,12 @@ const UPDATE_UNIFORMS = [
   'uBreathSpread',
   'uSegmentCount',
   'uSegments',
+  'uSegmentWidths',
   'uStrokeRadius',
   'uStrokeStrength',
+  'uStrokeEdgeNoise',
+  'uStrokeStreaks',
+  'uStrokeRim',
 ] as const
 
 const COMPOSITE_UNIFORMS = [
@@ -77,6 +81,7 @@ export class MirrorEngine {
   private readonly resizeObserver: ResizeObserver
   private readonly breathData = new Float32Array(MAX_BREATHS * 4)
   private readonly segmentData = new Float32Array(MAX_SEGMENTS * 4)
+  private readonly segmentWidths = new Float32Array(MAX_SEGMENTS * 2)
   private rafId = 0
   private videoFrameId = 0
   private hasNewFrame = false
@@ -242,7 +247,14 @@ export class MirrorEngine {
     const u = this.updateUniforms
 
     this.segmentData.fill(0)
-    segments.forEach((s, i) => this.segmentData.set([s.a.x, s.a.y, s.b.x, s.b.y], i * 4))
+    this.segmentWidths.fill(1)
+    segments.forEach((s, i) => {
+      this.segmentData.set([s.a.x, s.a.y, s.b.x, s.b.y], i * 4)
+      this.segmentWidths.set(
+        [strokeWidth(s.a.speed, params), strokeWidth(s.b.speed, params)],
+        i * 2,
+      )
+    })
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, field.write.framebuffer)
     gl.viewport(0, 0, field.width, field.height)
@@ -265,8 +277,12 @@ export class MirrorEngine {
     gl.uniform1f(u.uBreathSpread, params.breathSpread)
     gl.uniform1i(u.uSegmentCount, segments.length)
     gl.uniform4fv(u.uSegments, this.segmentData)
+    gl.uniform2fv(u.uSegmentWidths, this.segmentWidths)
     gl.uniform1f(u.uStrokeRadius, params.strokeRadius)
     gl.uniform1f(u.uStrokeStrength, params.strokeStrength)
+    gl.uniform1f(u.uStrokeEdgeNoise, params.strokeEdgeNoise)
+    gl.uniform1f(u.uStrokeStreaks, params.strokeStreaks)
+    gl.uniform1f(u.uStrokeRim, params.strokeRim)
     gl.drawArrays(gl.TRIANGLES, 0, 3)
     gl.bindFramebuffer(gl.FRAMEBUFFER, null)
     field.swap()
