@@ -4,16 +4,16 @@ Application web qui transforme l'écran en miroir embué : la webcam affiche le 
 
 ## Choix retenus
 
-| Sujet                  | Décision                                                                                                          |
-| ---------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| Niveau                 | Solution 2 : miroir réaliste                                                                                      |
-| Cible                  | Ordinateur + webcam (écran non tactile)                                                                           |
-| Interaction principale | Doigt en l'air (MediaPipe Hand Landmarker), souris en secours et pour le développement                            |
-| Déclencheur du souffle | Forme de la bouche (blendshapes) **et** bruit de souffle au micro, repli sur l'image seule si le micro est refusé |
-| Rendu                  | Shader WebGL2 avec un champ de densité de buée (textures ping-pong)                                               |
-| Stack                  | Vite + Svelte 5 + TypeScript, WebGL2 brut avec quelques helpers maison, `@mediapipe/tasks-vision`                 |
-| Hébergement            | Statique (GitHub Pages / Netlify / Vercel), HTTPS obligatoire pour caméra et micro                                |
-| Vie privée             | 100 % local : aucune image ni aucun son ne quitte l'appareil                                                      |
+| Sujet                  | Décision                                                                                          |
+| ---------------------- | ------------------------------------------------------------------------------------------------- |
+| Niveau                 | Solution 2 : miroir réaliste                                                                      |
+| Cible                  | Ordinateur + webcam (écran non tactile)                                                           |
+| Interaction principale | Doigt en l'air (MediaPipe Hand Landmarker), souris en secours et pour le développement            |
+| Déclencheur du souffle | Forme de la bouche seule (blendshapes) ; pas de micro (abandonné après essai, voir J4)            |
+| Rendu                  | Shader WebGL2 avec un champ de densité de buée (textures ping-pong)                               |
+| Stack                  | Vite + Svelte 5 + TypeScript, WebGL2 brut avec quelques helpers maison, `@mediapipe/tasks-vision` |
+| Hébergement            | Statique (GitHub Pages / Netlify / Vercel), HTTPS obligatoire pour la caméra                      |
+| Vie privée             | 100 % local : aucune image ne quitte l'appareil                                                   |
 
 ## Architecture
 
@@ -27,12 +27,9 @@ src/
       hand.ts          Hand Landmarker → { indexTip, isDrawing }
       scheduler.ts     Ordonnance les inférences (budget par frame, alternance face/main)
       filters.ts       Filtre One-Euro, hystérésis
-    audio/
-      breath.ts        Web Audio : calibration, détection du souffle → intensité 0..1
     input/
       events.ts        Bus d'événements unifié : BreathEvent{x,y,intensity}, StrokeEvent{x,y,radius}
       pointer.ts       Souris → StrokeEvent / BreathEvent (debug)
-      fusion.ts        Fusion visage + audio → BreathEvent
     coords.ts          Conversion vidéo normalisée → écran (miroir, object-fit: cover)
     fog/
       engine.ts        Contexte WebGL2, boucle de rendu, redimensionnement
@@ -92,12 +89,10 @@ Les durées sont des ordres de grandeur en jours de développement à temps part
 - La buée suit la bouche, ce qui crée la traînée quand on bouge la tête.
 - **Terminé quand** souffler devant la caméra embue le miroir au bon endroit, sans micro.
 
-### J4 — Souffle au micro et fusion (2 j)
+### J4 — Souffle au micro et fusion (abandonné)
 
-- Web Audio (`AnalyserNode`) : 1 s de calibration du bruit ambiant au démarrage, énergie RMS et proportion d'énergie dans les basses fréquences, durée minimale d'environ 200 ms.
-- Fusion : `intensité = forme de la bouche × niveau audio`. Si le micro est refusé, on utilise la forme de la bouche seule.
-- Le volume module la densité et la taille de la nappe de buée.
-- **Terminé quand** parler bouche ouverte n'embue (presque) pas, souffler embue, et souffler plus fort embue davantage.
+- Essayé puis retiré à la demande : le souffle est déclenché par la seule ouverture de la bouche (J3).
+- Le code (détection audio par niveau et platitude spectrale locale, fusion avec la forme de la bouche) est conservé dans un stash git, « J4 micro », si on veut y revenir.
 
 ### J5 — Doigt en l'air (3 j)
 
@@ -120,7 +115,7 @@ Les durées sont des ordres de grandeur en jours de développement à temps part
 
 ### J7 — Expérience et finition (2–3 j)
 
-- Parcours d'accueil : permissions, calibration du micro, consigne « Soufflez sur le miroir ».
+- Parcours d'accueil : permission de la caméra, consigne « Soufflez sur le miroir ».
 - Effacer tout (bouton, ou geste main ouverte maintenue).
 - Capture du miroir en PNG.
 - Plein écran, raccourcis clavier, panneau de réglages simplifié pour l'utilisateur.
@@ -130,21 +125,21 @@ Les durées sont des ordres de grandeur en jours de développement à temps part
 
 ### J8 — Publication (1 j)
 
-- Tests unitaires sur la logique pure (`coords`, filtres, fusion, détecteur audio sur des signaux de synthèse).
+- Tests unitaires sur la logique pure (`coords`, filtres, détecteur de forme de souffle).
 - README, page « vie privée » (tout est local), mise en ligne de la v1.
 
-**Total estimé : environ 17 à 21 jours de développement.**
+**Total estimé : environ 15 à 19 jours de développement** (sans J4).
 
 ## Risques et parades
 
-| Risque                                                            | Parade                                                                                  |
-| ----------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
-| Faire tourner visage et main en même temps est trop lent          | Alternance des modèles, vidéo d'entrée réduite, Web Worker, qualité adaptative (J5, J7) |
-| Faux positifs au micro (parole, bruit de la pièce)                | Fusion avec la forme de la bouche, calibration, durée minimale (J4)                     |
-| Scores des blendshapes variables selon la personne et l'éclairage | Seuils réglables, calibration rapide au démarrage si nécessaire                         |
-| Tracé du doigt qui tremble                                        | Filtre One-Euro, hystérésis, curseur de retour visuel (J5)                              |
-| Textures flottantes absentes sur certains navigateurs             | Repli `RGBA8` (J2)                                                                      |
-| Décalage entre image et coordonnées (miroir, recadrage)           | Une seule fonction `coords.ts`, testée unitairement                                     |
+| Risque                                                                  | Parade                                                                                  |
+| ----------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| Faire tourner visage et main en même temps est trop lent                | Alternance des modèles, vidéo d'entrée réduite, Web Worker, qualité adaptative (J5, J7) |
+| Buée déclenchée en parlant bouche ouverte (pas de micro pour confirmer) | Seuils de la forme de la bouche réglables (J3) ; accepté                                |
+| Scores des blendshapes variables selon la personne et l'éclairage       | Seuils réglables, calibration rapide au démarrage si nécessaire                         |
+| Tracé du doigt qui tremble                                              | Filtre One-Euro, hystérésis, curseur de retour visuel (J5)                              |
+| Textures flottantes absentes sur certains navigateurs                   | Repli `RGBA8` (J2)                                                                      |
+| Décalage entre image et coordonnées (miroir, recadrage)                 | Une seule fonction `coords.ts`, testée unitairement                                     |
 
 ## Pistes après la v1
 
