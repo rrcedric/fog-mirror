@@ -14,10 +14,11 @@
     <div>caméra <b>{stats.cameraFps > 0 ? stats.cameraFps.toFixed(0) : '—'}</b> fps</div>
     <div>vidéo {stats.videoSize[0]}×{stats.videoSize[1]}</div>
     <div>canvas {stats.canvasSize[0]}×{stats.canvasSize[1]}</div>
+    <div>buée {stats.fieldSize[0]}×{stats.fieldSize[1]} {stats.fieldFormat}</div>
   {:else}
     <div>démarrage…</div>
   {/if}
-  <div class="hint">D : masquer</div>
+  <div class="hint">D : masquer les réglages</div>
 </aside>
 
 <style>

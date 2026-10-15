@@ -50,7 +50,8 @@ export function uniformLocations<K extends string>(
 export function createVideoTexture(gl: WebGL2RenderingContext): WebGLTexture {
   const tex = gl.createTexture()
   gl.bindTexture(gl.TEXTURE_2D, tex)
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
+  // Mipmaps : le flou de la buée lit des niveaux réduits de l'image.
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR)
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
@@ -66,5 +67,15 @@ export function createVideoTexture(gl: WebGL2RenderingContext): WebGLTexture {
     gl.UNSIGNED_BYTE,
     new Uint8Array([0, 0, 0, 255]),
   )
+  gl.generateMipmap(gl.TEXTURE_2D)
   return tex
+}
+
+/** Remplace les lignes `#include "nom"` par le contenu des fragments fournis. */
+export function resolveIncludes(source: string, chunks: Record<string, string>): string {
+  return source.replace(/^#include "([^"]+)"$/gm, (_, name: string) => {
+    const chunk = chunks[name]
+    if (chunk === undefined) throw new Error(`Unknown shader include: ${name}`)
+    return chunk
+  })
 }

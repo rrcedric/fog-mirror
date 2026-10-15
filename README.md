@@ -20,7 +20,16 @@ npm run dev
 | `npm run format` | Prettier                                         |
 | `npm test`       | Tests unitaires (Vitest)                         |
 
-Raccourci dans l'app : `D` affiche ou masque l'overlay de debug (FPS, résolutions).
+Dans l'app :
+
+| Contrôle                                       | Effet                                                            |
+| ---------------------------------------------- | ---------------------------------------------------------------- |
+| Maintenir le clic gauche                       | Souffler à la position du pointeur                               |
+| Clic droit glissé, ou Maj + clic gauche glissé | Écrire dans la buée                                              |
+| `E` / `C`                                      | Tout embuer / tout effacer                                       |
+| `D`                                            | Afficher ou masquer l'overlay de debug et le panneau de réglages |
+
+Ajouter `?r8` à l'URL force le champ de buée en 8 bits, pour tester le repli utilisé quand les textures flottantes ne sont pas disponibles.
 
 ## Déploiement
 
