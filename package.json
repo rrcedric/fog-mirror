@@ -11,7 +11,8 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "postinstall": "node scripts/copy-mediapipe-wasm.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -33,6 +34,7 @@
     "vitest": "^5.0.4"
   },
   "dependencies": {
+    "@mediapipe/tasks-vision": "^1.1.1",
     "tweakpane": "^4.0.5"
   }
 }

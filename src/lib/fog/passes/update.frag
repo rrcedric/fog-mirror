@@ -25,6 +25,7 @@ uniform float uDiffusion;
 uniform int uBreathCount;
 uniform vec4 uBreaths[MAX_BREATHS]; // x, y, rayon, intensité
 uniform float uBreathRate;
+uniform float uBreathSpread;
 
 uniform int uSegmentCount;
 uniform vec4 uSegments[MAX_SEGMENTS]; // ax, ay, bx, by
@@ -65,7 +66,9 @@ void main() {
     vec4 b = uBreaths[i];
     vec2 delta = (p - b.xy * scale) / b.z;
     float edge = 0.55 + 0.9 * fbm(p * 14.0 + uTime * 0.7);
-    float deposit = exp(-dot(delta, delta) * 2.5 * edge);
+    // Profil « super-gaussien » : avec uBreathSpread > 1, le plateau central s'élargit et les bords
+    // de la nappe se remplissent plus vite.
+    float deposit = exp(-pow(dot(delta, delta), uBreathSpread) * 2.5 * edge);
     d += uDt * uBreathRate * b.w * deposit * (1.0 - 0.5 * d);
   }
 

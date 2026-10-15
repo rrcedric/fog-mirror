@@ -3,9 +3,14 @@
   import { MirrorEngine, type EngineStats } from '../lib/fog/engine'
   import { createParams } from '../lib/fog/params'
   import { InputBus } from '../lib/input/events'
+  import { FaceBreathInput, type FaceBreathDebug } from '../lib/input/face-breath'
   import { attachPointerInput } from '../lib/input/pointer'
+  import { DEFAULT_BREATH_SHAPE_PARAMS } from '../lib/tracking/breath-shape'
+  import type { FaceTracker } from '../lib/tracking/face'
   import DebugOverlay from './DebugOverlay.svelte'
   import DevPanel from './DevPanel.svelte'
+  import FaceOverlay from './FaceOverlay.svelte'
+  import type { FaceStatus } from './face-status'
   import type { AppErrorKind } from './messages'
 
   interface Props {
@@ -15,8 +20,9 @@
 
   let { stream, onerror }: Props = $props()
 
-  // Objet simple (non réactif) : lu à chaque frame par le moteur, modifié par le panneau.
+  // Objets simples (non réactifs) : lus en continu par le moteur, modifiés par le panneau.
   const params = createParams()
+  const faceParams = { ...DEFAULT_BREATH_SHAPE_PARAMS }
   const input = new InputBus()
 
   let canvas: HTMLCanvasElement
@@ -24,13 +30,46 @@
   let engine: MirrorEngine | undefined
   let showDebug = $state(import.meta.env.DEV)
   let stats = $state<EngineStats | null>(null)
+  let faceStatus = $state<FaceStatus>({ name: 'loading' })
+  let faceDebug = $state<FaceBreathDebug | null>(null)
 
   onMount(() => {
     let disposed = false
+    let tracker: FaceTracker | undefined
+    let faceInput: FaceBreathInput | undefined
     const track = stream.getVideoTracks()[0]
     const onEnded = () => onerror('ended')
     track?.addEventListener('ended', onEnded)
     const detachPointer = attachPointerInput(canvas, input)
+
+    async function startFaceTracking(engine: MirrorEngine) {
+      try {
+        // Chargé à part : MediaPipe ne doit pas retarder l'affichage du miroir.
+        const { FaceTracker } = await import('../lib/tracking/face')
+        tracker = await FaceTracker.create()
+      } catch (err) {
+        console.error(err)
+        if (!disposed) faceStatus = { name: 'error' }
+        return
+      }
+      if (disposed) {
+        tracker.close()
+        return
+      }
+      faceInput = new FaceBreathInput(
+        tracker,
+        video,
+        input,
+        () => engine.coverTransform,
+        () => canvas.width / canvas.height,
+        faceParams,
+        (debug) => {
+          if (showDebug) faceDebug = debug
+        },
+      )
+      faceInput.start()
+      faceStatus = { name: 'ready', delegate: tracker.delegate }
+    }
 
     video.srcObject = stream
     video
@@ -49,6 +88,7 @@
           return
         }
         engine.start()
+        startFaceTracking(engine)
       })
       .catch((err) => {
         console.error(err)
@@ -64,6 +104,8 @@
       clearInterval(statsTimer)
       detachPointer()
       track?.removeEventListener('ended', onEnded)
+      faceInput?.stop()
+      tracker?.close()
       engine?.dispose()
       engine = undefined
       video.srcObject = null
@@ -85,13 +127,23 @@
 <canvas bind:this={canvas} aria-label="Miroir"></canvas>
 
 <p class="hint">
-  Maintenir le clic : souffler · Clic droit ou Maj + glisser : écrire · E : tout embuer · C : tout
-  effacer
+  {#if faceStatus.name === 'ready'}
+    Ouvrez la bouche comme pour souffler sur le miroir · Clic droit ou Maj + glisser : écrire · E /
+    C : tout embuer / effacer
+  {:else if faceStatus.name === 'loading'}
+    Chargement de la détection du visage…
+  {:else}
+    Détection du visage indisponible · Maintenir le clic : souffler · Clic droit ou Maj + glisser :
+    écrire
+  {/if}
 </p>
 
 {#if showDebug}
-  <DebugOverlay {stats} />
-  <DevPanel {params} onfill={(d) => engine?.fillFog(d)} />
+  {#if faceDebug}
+    <FaceOverlay debug={faceDebug} />
+  {/if}
+  <DebugOverlay {stats} {faceStatus} {faceDebug} {faceParams} />
+  <DevPanel fog={params} face={faceParams} onfill={(d) => engine?.fillFog(d)} />
 {/if}
 
 <style>

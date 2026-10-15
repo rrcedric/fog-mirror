@@ -41,6 +41,7 @@ const UPDATE_UNIFORMS = [
   'uBreathCount',
   'uBreaths',
   'uBreathRate',
+  'uBreathSpread',
   'uSegmentCount',
   'uSegments',
   'uStrokeRadius',
@@ -204,7 +205,7 @@ export class MirrorEngine {
     const { breaths, segments } = this.input.drain()
     this.breathData.fill(0)
     breaths.slice(0, MAX_BREATHS).forEach((b, i) => {
-      this.breathData.set([b.x, b.y, params.breathRadius, b.intensity], i * 4)
+      this.breathData.set([b.x, b.y, params.breathRadius * (b.scale ?? 1), b.intensity], i * 4)
     })
     // Au-delà de MAX_SEGMENTS segments dans une frame, on enchaîne des passes supplémentaires
     // sans faire avancer le temps (dt = 0).
@@ -261,6 +262,7 @@ export class MirrorEngine {
     gl.uniform1i(u.uBreathCount, Math.min(breathCount, MAX_BREATHS))
     gl.uniform4fv(u.uBreaths, this.breathData)
     gl.uniform1f(u.uBreathRate, params.breathRate)
+    gl.uniform1f(u.uBreathSpread, params.breathSpread)
     gl.uniform1i(u.uSegmentCount, segments.length)
     gl.uniform4fv(u.uSegments, this.segmentData)
     gl.uniform1f(u.uStrokeRadius, params.strokeRadius)

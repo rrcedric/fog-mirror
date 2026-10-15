@@ -22,14 +22,24 @@ npm run dev
 
 Dans l'app :
 
-| Contrôle                                       | Effet                                                            |
-| ---------------------------------------------- | ---------------------------------------------------------------- |
-| Maintenir le clic gauche                       | Souffler à la position du pointeur                               |
-| Clic droit glissé, ou Maj + clic gauche glissé | Écrire dans la buée                                              |
-| `E` / `C`                                      | Tout embuer / tout effacer                                       |
-| `D`                                            | Afficher ou masquer l'overlay de debug et le panneau de réglages |
+| Contrôle                                                          | Effet                                                            |
+| ----------------------------------------------------------------- | ---------------------------------------------------------------- |
+| Ouvrir la bouche face à la caméra (« o », moue ou bouche ouverte) | Souffler : la buée naît sur la bouche et suit la tête            |
+| Maintenir le clic gauche                                          | Souffler à la position du pointeur                               |
+| Clic droit glissé, ou Maj + clic gauche glissé                    | Écrire dans la buée                                              |
+| `E` / `C`                                                         | Tout embuer / tout effacer                                       |
+| `D`                                                               | Afficher ou masquer l'overlay de debug et le panneau de réglages |
 
 Ajouter `?r8` à l'URL force le champ de buée en 8 bits, pour tester le repli utilisé quand les textures flottantes ne sont pas disponibles.
+
+## Détection du visage
+
+La bouche est détectée par [MediaPipe Face Landmarker](https://developers.google.com/edge/mediapipe/solutions/vision/face_landmarker/web_js), entièrement dans le navigateur. Tout est servi depuis le site lui-même :
+
+- le modèle `public/models/face_landmarker.task` (float16, version 1) est versionné dans le dépôt ;
+- les fichiers WASM sont copiés depuis `node_modules` vers `public/mediapipe/wasm` par `scripts/copy-mediapipe-wasm.mjs`, lancé automatiquement après `npm install`.
+
+Le panneau de réglages (`D`) affiche le contour des lèvres, le score de « forme de souffle » et ses seuils, et permet de les ajuster dans le dossier « Visage ».
 
 ## Déploiement
 

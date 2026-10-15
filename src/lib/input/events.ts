@@ -3,6 +3,8 @@ import type { Point } from '../coords'
 /** Souffle en cours, en coordonnées écran normalisées. `intensity` dans [0, 1]. */
 export interface Breath extends Point {
   intensity: number
+  /** Facteur appliqué au rayon de base de la nappe (1 par défaut). */
+  scale?: number
 }
 
 /** Segment de trace de doigt, en coordonnées écran normalisées. */
