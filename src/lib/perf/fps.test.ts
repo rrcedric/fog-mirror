@@ -14,4 +14,12 @@ describe('FpsMeter', () => {
     for (let i = 0; i < 200; i++) m.tick(i * (1000 / 60))
     expect(m.fps).toBeCloseTo(60, 1)
   })
+
+  it('drops when ticks stop arriving', () => {
+    const m = new FpsMeter()
+    for (let i = 0; i < 100; i++) m.tick(i * (1000 / 30))
+    const last = 99 * (1000 / 30)
+    expect(m.fpsAt(last + 10)).toBeCloseTo(30, 0)
+    expect(m.fpsAt(last + 1000)).toBeCloseTo(1, 1)
+  })
 })

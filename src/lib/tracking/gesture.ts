@@ -75,3 +75,49 @@ export class PointingDetector {
     return this.active
   }
 }
+
+export interface OpenPalmParams {
+  /** Extension minimale de chacun des quatre doigts pour une main ouverte. */
+  extension: number
+  /** Durée pendant laquelle la main doit rester ouverte, en secondes. */
+  holdTime: number
+}
+
+export const DEFAULT_OPEN_PALM_PARAMS: OpenPalmParams = { extension: 1.3, holdTime: 1 }
+
+export interface OpenPalmState {
+  /** Avancement du maintien, de 0 à 1 (pour l'afficher sur le curseur). */
+  progress: number
+  /** Vrai sur la seule frame où le geste est validé. */
+  triggered: boolean
+}
+
+/**
+ * Reconnaît une main ouverte (quatre doigts tendus) maintenue un moment : le geste « tout
+ * effacer ». Une fois déclenché, il faut refermer la main avant de pouvoir recommencer.
+ */
+export class OpenPalmDetector {
+  private held = 0
+  private armed = true
+
+  constructor(private readonly params: OpenPalmParams) {}
+
+  update(pose: HandPose | null, dt: number): OpenPalmState {
+    const p = this.params
+    const open =
+      pose !== null && Math.min(pose.index, pose.middle, pose.ring, pose.pinky) >= p.extension
+    if (!open) {
+      this.held = 0
+      this.armed = true
+      return { progress: 0, triggered: false }
+    }
+    if (!this.armed) return { progress: 0, triggered: false }
+    this.held += dt
+    if (this.held >= p.holdTime) {
+      this.armed = false
+      this.held = 0
+      return { progress: 1, triggered: true }
+    }
+    return { progress: this.held / p.holdTime, triggered: false }
+  }
+}

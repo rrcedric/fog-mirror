@@ -45,6 +45,9 @@
     <div>canvas {stats.canvasSize[0]}×{stats.canvasSize[1]}</div>
     <div>buée {stats.fieldSize[0]}×{stats.fieldSize[1]} {stats.fieldFormat}</div>
     <div>gouttes qui coulent <b>{stats.drips}</b></div>
+    <div>
+      qualité : pixels ×{stats.quality.pixelRatio} · champ ×{stats.quality.fieldScale}
+    </div>
   {:else}
     <div>démarrage…</div>
   {/if}

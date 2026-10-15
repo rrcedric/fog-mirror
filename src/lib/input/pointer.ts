@@ -11,9 +11,16 @@ const SOURCE = 'pointer'
  *
  * Renvoie une fonction qui retire les écouteurs.
  */
-export function attachPointerInput(element: HTMLElement, bus: InputBus): () => void {
+export function attachPointerInput(
+  element: HTMLElement,
+  bus: InputBus,
+  /** Signale un souffle terminé (durée en secondes) ou un bout de trait (longueur en écrans). */
+  onActivity?: (kind: 'breath' | 'stroke', amount: number) => void,
+): () => void {
   let mode: 'breath' | 'stroke' | null = null
   let pointerId = -1
+  let breathStart = 0
+  let last: Point | null = null
   const speed = new SpeedMeter()
 
   const toPoint = (e: PointerEvent): Point => {
@@ -24,12 +31,19 @@ export function attachPointerInput(element: HTMLElement, bus: InputBus): () => v
   const apply = (e: PointerEvent) => {
     const p = toPoint(e)
     if (mode === 'breath') bus.setBreath(SOURCE, { ...p, intensity: 1 })
-    else if (mode === 'stroke')
+    else if (mode === 'stroke') {
       bus.strokeTo(SOURCE, { ...p, speed: speed.update(p, e.timeStamp / 1000) })
+      if (last) onActivity?.('stroke', Math.hypot(p.x - last.x, p.y - last.y))
+      last = p
+    }
   }
 
   const end = () => {
-    if (mode === 'breath') bus.setBreath(SOURCE, null)
+    if (mode === 'breath') {
+      bus.setBreath(SOURCE, null)
+      onActivity?.('breath', (performance.now() - breathStart) / 1000)
+    }
+    last = null
     if (mode === 'stroke') bus.strokeEnd(SOURCE)
     speed.reset()
     mode = null
@@ -42,6 +56,7 @@ export function attachPointerInput(element: HTMLElement, bus: InputBus): () => v
     else if (e.button === 0) mode = 'breath'
     else return
     pointerId = e.pointerId
+    breathStart = performance.now()
     try {
       element.setPointerCapture(e.pointerId)
     } catch {

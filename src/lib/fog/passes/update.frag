@@ -20,6 +20,8 @@ uniform float uAspect;
 uniform float uTime;
 uniform float uDt;
 uniform float uDither;
+// Effacement global en cours (bouton, geste main ouverte) : part retirée sur cette frame.
+uniform float uFade;
 
 uniform float uEvaporation;
 uniform float uEvaporationFloor;
@@ -129,6 +131,8 @@ void main() {
   // Le doigt emporte une partie de l'eau : le tracé ne se reforme qu'à hauteur de uRefogAmount.
   f.g *= 1.0 - cleared * (1.0 - uRefogAmount);
   f += uStrokeRim * rim * (1.0 - wipe) * before;
+
+  f *= 1.0 - uFade;
 
   // Tramage : en 8 bits, sans lui, les petites variations par frame seraient arrondies à zéro.
   f += (hash12(gl_FragCoord.xy + fract(uTime * 7.31) * 113.0) - 0.5) * uDither;

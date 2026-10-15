@@ -1,7 +1,14 @@
 import { videoToScreen, type CoverTransform, type Point } from '../coords'
 import { FpsMeter } from '../perf/fps'
 import { OneEuroFilter2D, type OneEuroParams } from '../tracking/filters'
-import { handPose, PointingDetector, type HandPose, type PointingParams } from '../tracking/gesture'
+import {
+  handPose,
+  OpenPalmDetector,
+  PointingDetector,
+  type HandPose,
+  type OpenPalmParams,
+  type PointingParams,
+} from '../tracking/gesture'
 import type { HandTracker } from '../tracking/hand'
 import { HAND } from '../tracking/hand-landmarks'
 import type { TrackingTask } from '../tracking/scheduler'
@@ -16,6 +23,8 @@ export interface HandCursor {
   /** Coordonnées écran normalisées, filtrées. */
   position: Point
   drawing: boolean
+  /** Avancement du geste « main ouverte » qui efface tout, de 0 à 1. */
+  clearProgress: number
 }
 
 export interface HandStrokeDebug {
@@ -30,7 +39,10 @@ export interface HandStrokeDebug {
 export interface HandStrokeOptions {
   getCover: () => CoverTransform
   pointingParams: PointingParams
+  openPalmParams: OpenPalmParams
   filterParams: OneEuroParams
+  /** Appelé quand la main ouverte a été maintenue assez longtemps : tout effacer. */
+  onClear?: () => void
   onCursor?: (cursor: HandCursor | null) => void
   onDebug?: (debug: HandStrokeDebug) => void
 }
@@ -43,6 +55,8 @@ export interface HandStrokeOptions {
 export class HandStrokeInput implements TrackingTask {
   readonly name = 'hand'
   private readonly pointing: PointingDetector
+  private readonly openPalm: OpenPalmDetector
+  private lastRun = -1
   private readonly filter: OneEuroFilter2D
   private readonly fps = new FpsMeter()
   private readonly speed = new SpeedMeter()
@@ -56,6 +70,7 @@ export class HandStrokeInput implements TrackingTask {
     private readonly options: HandStrokeOptions,
   ) {
     this.pointing = new PointingDetector(options.pointingParams)
+    this.openPalm = new OpenPalmDetector(options.openPalmParams)
     this.filter = new OneEuroFilter2D(options.filterParams)
   }
 
@@ -79,8 +94,12 @@ export class HandStrokeInput implements TrackingTask {
     const observation = this.tracker.detect(this.video)
     const inferenceMs = performance.now() - t0
 
+    const dt = this.lastRun < 0 ? 0 : (now - this.lastRun) / 1000
+    this.lastRun = now
     const pose = observation ? handPose(observation.world) : null
     const drawing = this.pointing.update(pose)
+    const palm = this.openPalm.update(pose, dt)
+    if (palm.triggered) this.options.onClear?.()
     const cover = this.options.getCover()
     const toScreen = (p: Point) => videoToScreen(p, cover)
 
@@ -94,7 +113,7 @@ export class HandStrokeInput implements TrackingTask {
       } else if (this.drawing) {
         this.endStroke()
       }
-      this.options.onCursor?.({ position: tip, drawing })
+      this.options.onCursor?.({ position: tip, drawing, clearProgress: palm.progress })
     } else {
       this.filter.reset()
       this.speed.reset()

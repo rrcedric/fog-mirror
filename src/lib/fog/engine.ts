@@ -19,9 +19,19 @@ export interface EngineStats {
   fieldSize: [number, number]
   fieldFormat: FieldFormat
   drips: number
+  quality: Quality
 }
 
-const MAX_PIXEL_RATIO = 2
+/** Réglage de qualité appliqué par la qualité adaptative. */
+export interface Quality {
+  /** Densité de pixels maximale du canvas. */
+  pixelRatio: number
+  /** Facteur appliqué à la résolution du champ de buée (params.fieldScale). */
+  fieldScale: number
+}
+
+/** Durée de l'effacement progressif du miroir, en secondes. */
+const WIPE_DURATION = 0.7
 /** Pas de temps maximal : évite un saut brutal après un onglet resté en arrière-plan. */
 const MAX_DT = 1 / 20
 // Doivent correspondre aux #define de update.frag.
@@ -37,6 +47,7 @@ const UPDATE_UNIFORMS = [
   'uTime',
   'uDt',
   'uDither',
+  'uFade',
   'uEvaporation',
   'uEvaporationFloor',
   'uEvaporationVariation',
@@ -95,6 +106,8 @@ export class MirrorEngine {
   private readonly blur: BlurPyramid
   private readonly drips: DripSystem
   private readonly dripData = new Float32Array(MAX_DRIPS * 4)
+  private quality: Quality = { pixelRatio: 2, fieldScale: 1 }
+  private wipeRemaining = 0
   private readonly renderFps = new FpsMeter()
   private readonly cameraFps = new FpsMeter()
   private readonly resizeObserver: ResizeObserver
@@ -168,6 +181,28 @@ export class MirrorEngine {
   }
 
   /** Remplit le miroir de buée (`density` = 1) ou l'efface (`density` = 0). */
+  /** Efface progressivement tout le miroir (en WIPE_DURATION secondes). */
+  wipeAll(): void {
+    this.wipeRemaining = WIPE_DURATION
+    this.drips.clear(this.input)
+  }
+
+  /** Fixe la qualité de rendu (densité de pixels, résolution du champ). */
+  setQuality(quality: Quality): void {
+    this.quality = quality
+    this.resize()
+  }
+
+  /**
+   * Image actuelle du miroir en PNG, telle qu'à l'écran (reflet en miroir, texte écrit lisible),
+   * sans l'interface, qui n'est pas dans le canvas.
+   */
+  capture(): Promise<Blob | null> {
+    // Sans preserveDrawingBuffer, le canvas n'est lisible que juste après un rendu : on en refait un.
+    this.composite()
+    return new Promise((resolve) => this.canvas.toBlob(resolve, 'image/png'))
+  }
+
   fillFog(density: number): void {
     this.field.fill(density)
     // Un miroir essuyé n'a plus d'eau pour faire couler des gouttes.
@@ -176,13 +211,14 @@ export class MirrorEngine {
 
   get stats(): EngineStats {
     return {
-      renderFps: this.renderFps.fps,
-      cameraFps: this.cameraFps.fps,
+      renderFps: this.renderFps.fpsAt(performance.now()),
+      cameraFps: this.cameraFps.fpsAt(performance.now()),
       canvasSize: [this.canvas.width, this.canvas.height],
       videoSize: [this.video.videoWidth, this.video.videoHeight],
       fieldSize: [this.field.width, this.field.height],
       fieldFormat: this.field.format,
       drips: this.drips.count,
+      quality: this.quality,
     }
   }
 
@@ -206,7 +242,7 @@ export class MirrorEngine {
   }
 
   private resize(): void {
-    const dpr = Math.min(window.devicePixelRatio || 1, MAX_PIXEL_RATIO)
+    const dpr = Math.min(window.devicePixelRatio || 1, this.quality.pixelRatio)
     const width = Math.max(1, Math.round(this.canvas.clientWidth * dpr))
     const height = Math.max(1, Math.round(this.canvas.clientHeight * dpr))
     if (this.canvas.width !== width || this.canvas.height !== height) {
@@ -219,8 +255,8 @@ export class MirrorEngine {
   private resizeField(): void {
     const { canvas, params } = this
     this.field.resize(
-      Math.max(1, Math.round(canvas.width * params.fieldScale)),
-      Math.max(1, Math.round(canvas.height * params.fieldScale)),
+      Math.max(1, Math.round(canvas.width * params.fieldScale * this.quality.fieldScale)),
+      Math.max(1, Math.round(canvas.height * params.fieldScale * this.quality.fieldScale)),
     )
   }
 
@@ -297,6 +333,11 @@ export class MirrorEngine {
     gl.uniform1f(u.uTime, time)
     gl.uniform1f(u.uDt, dt)
     gl.uniform1f(u.uDither, field.format === 'RG8' && dt > 0 ? 1 / 255 : 0)
+    // Effacement global : décroissance exponentielle rapide, jusqu'à zéro à la fin.
+    const fade =
+      this.wipeRemaining > 0 ? (dt >= this.wipeRemaining ? 1 : 1 - Math.exp(-dt / 0.12)) : 0
+    this.wipeRemaining = Math.max(0, this.wipeRemaining - dt)
+    gl.uniform1f(u.uFade, fade)
     gl.uniform1f(u.uEvaporation, params.evaporation)
     gl.uniform1f(u.uEvaporationFloor, params.evaporationFloor)
     gl.uniform1f(u.uEvaporationVariation, params.evaporationVariation)

@@ -50,6 +50,7 @@ body {
   border: 1px solid var(--card-border);
   border-radius: 20px;
   background: var(--card);
+  -webkit-backdrop-filter: blur(16px);
   backdrop-filter: blur(16px);
   text-align: center;
 }

@@ -17,4 +17,15 @@ export class FpsMeter {
   get fps(): number {
     return this.avgDelta > 0 ? 1000 / this.avgDelta : 0
   }
+
+  /**
+   * Fréquence à l'instant `now` : comme `fps`, mais si aucun tick n'est arrivé depuis plus longtemps
+   * que l'intervalle moyen, la fréquence ne peut pas dépasser 1 / (temps écoulé depuis le dernier).
+   * Évite d'afficher une valeur figée quand les ticks s'arrêtent (onglet suspendu, caméra coupée).
+   */
+  fpsAt(now: number): number {
+    if (this.last < 0) return 0
+    const since = now - this.last
+    return since > this.avgDelta ? Math.min(this.fps, 1000 / since) : this.fps
+  }
 }
