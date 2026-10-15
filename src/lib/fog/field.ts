@@ -1,4 +1,5 @@
-export type FieldFormat = 'R16F' | 'R8'
+/** Deux canaux : buée visible (R) et humidité vers laquelle elle se reforme (G). */
+export type FieldFormat = 'RG16F' | 'RG8'
 
 interface Target {
   texture: WebGLTexture
@@ -9,14 +10,14 @@ interface Target {
 function detectFormat(gl: WebGL2RenderingContext): FieldFormat {
   const floatOk =
     gl.getExtension('EXT_color_buffer_float') || gl.getExtension('EXT_color_buffer_half_float')
-  if (!floatOk) return 'R8'
+  if (!floatOk) return 'RG8'
   // Certains pilotes annoncent l'extension mais refusent le framebuffer : on vérifie.
-  const probe = createTarget(gl, 'R16F', 4, 4)
+  const probe = createTarget(gl, 'RG16F', 4, 4)
   gl.bindFramebuffer(gl.FRAMEBUFFER, probe.framebuffer)
   const ok = gl.checkFramebufferStatus(gl.FRAMEBUFFER) === gl.FRAMEBUFFER_COMPLETE
   gl.bindFramebuffer(gl.FRAMEBUFFER, null)
   deleteTarget(gl, probe)
-  return ok ? 'R16F' : 'R8'
+  return ok ? 'RG16F' : 'RG8'
 }
 
 function createTarget(
@@ -27,10 +28,10 @@ function createTarget(
 ): Target {
   const texture = gl.createTexture()
   gl.bindTexture(gl.TEXTURE_2D, texture)
-  if (format === 'R16F') {
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.R16F, width, height, 0, gl.RED, gl.HALF_FLOAT, null)
+  if (format === 'RG16F') {
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RG16F, width, height, 0, gl.RG, gl.HALF_FLOAT, null)
   } else {
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, width, height, 0, gl.RED, gl.UNSIGNED_BYTE, null)
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RG8, width, height, 0, gl.RG, gl.UNSIGNED_BYTE, null)
   }
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
@@ -52,7 +53,7 @@ function deleteTarget(gl: WebGL2RenderingContext, t: Target): void {
 }
 
 /**
- * Champ de densité de buée : deux textures d'un canal qu'on alterne (ping-pong).
+ * Champ de densité de buée : deux textures à deux canaux qu'on alterne (ping-pong).
  * On lit `read`, on dessine dans `write`, puis `swap()`.
  */
 export class FogField {
@@ -113,12 +114,12 @@ export class FogField {
     this.height = height
   }
 
-  /** Remplit tout le champ avec une densité uniforme. */
+  /** Remplit tout le champ avec une densité uniforme (buée visible et humidité). */
   fill(density: number): void {
     if (!this.targets) return
     const { gl } = this
     gl.bindFramebuffer(gl.FRAMEBUFFER, this.read.framebuffer)
-    gl.clearColor(density, 0, 0, 1)
+    gl.clearColor(density, density, 0, 1)
     gl.clear(gl.COLOR_BUFFER_BIT)
     gl.bindFramebuffer(gl.FRAMEBUFFER, null)
   }

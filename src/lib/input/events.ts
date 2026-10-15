@@ -11,12 +11,16 @@ export interface Breath extends Point {
 export interface StrokePoint extends Point {
   /** Vitesse du doigt en écrans par seconde (0 si inconnue) : un doigt rapide trace plus fin. */
   speed: number
+  /** Largeur imposée, en fraction de l'épaisseur du trait ; sinon déduite de la vitesse. */
+  width?: number
 }
 
-/** Segment de trace de doigt. */
+/** Segment de trace. */
 export interface Segment {
   a: StrokePoint
   b: StrokePoint
+  /** Source qui l'a tracé (« hand », « pointer », « drip:3 »…). */
+  source: string
 }
 
 export interface FrameInput {
@@ -41,10 +45,15 @@ export class InputBus {
     else this.breaths.delete(source)
   }
 
-  strokeTo(source: string, point: Point & { speed?: number }): void {
-    const next: StrokePoint = { x: point.x, y: point.y, speed: point.speed ?? 0 }
+  strokeTo(source: string, point: Point & { speed?: number; width?: number }): void {
+    const next: StrokePoint = {
+      x: point.x,
+      y: point.y,
+      speed: point.speed ?? 0,
+      width: point.width,
+    }
     const last = this.lastPoints.get(source) ?? next
-    this.segments.push({ a: { ...last }, b: next })
+    this.segments.push({ a: { ...last }, b: next, source })
     this.lastPoints.set(source, next)
   }
 

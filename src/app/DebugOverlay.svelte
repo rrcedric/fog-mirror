@@ -44,6 +44,7 @@
     <div>vidéo {stats.videoSize[0]}×{stats.videoSize[1]}</div>
     <div>canvas {stats.canvasSize[0]}×{stats.canvasSize[1]}</div>
     <div>buée {stats.fieldSize[0]}×{stats.fieldSize[1]} {stats.fieldFormat}</div>
+    <div>gouttes qui coulent <b>{stats.drips}</b></div>
   {:else}
     <div>démarrage…</div>
   {/if}

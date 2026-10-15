@@ -1,6 +1,8 @@
 import { coverTransform, type CoverTransform } from '../coords'
 import type { InputBus, Segment } from '../input/events'
 import { FpsMeter } from '../perf/fps'
+import { BlurPyramid } from './blur'
+import { DripSystem, MAX_DRIPS } from './drips'
 import { FogField, type FieldFormat } from './field'
 import { createProgram, createVideoTexture, resolveIncludes, uniformLocations } from './gl'
 import { strokeWidth, type FogParams } from './params'
@@ -16,6 +18,7 @@ export interface EngineStats {
   videoSize: [number, number]
   fieldSize: [number, number]
   fieldFormat: FieldFormat
+  drips: number
 }
 
 const MAX_PIXEL_RATIO = 2
@@ -38,10 +41,13 @@ const UPDATE_UNIFORMS = [
   'uEvaporationFloor',
   'uEvaporationVariation',
   'uDiffusion',
+  'uRefogTime',
+  'uRefogAmount',
   'uBreathCount',
   'uBreaths',
   'uBreathRate',
   'uBreathSpread',
+  'uBreathWarp',
   'uSegmentCount',
   'uSegments',
   'uSegmentWidths',
@@ -54,14 +60,24 @@ const UPDATE_UNIFORMS = [
 
 const COMPOSITE_UNIFORMS = [
   'uVideo',
+  'uBlurLight',
+  'uBlurHeavy',
   'uField',
+  'uFieldTexel',
   'uCoverScale',
   'uCoverOffset',
   'uAspect',
-  'uVideoSize',
-  'uBlurRadius',
   'uVeilOpacity',
   'uFogColor',
+  'uScatter',
+  'uDroplets',
+  'uDropletScale',
+  'uWetEdge',
+  'uRefraction',
+  'uGrain',
+  'uMottling',
+  'uDripCount',
+  'uDrips',
 ] as const
 
 /**
@@ -76,6 +92,9 @@ export class MirrorEngine {
   private readonly compositeUniforms
   private readonly videoTexture: WebGLTexture
   private readonly field: FogField
+  private readonly blur: BlurPyramid
+  private readonly drips: DripSystem
+  private readonly dripData = new Float32Array(MAX_DRIPS * 4)
   private readonly renderFps = new FpsMeter()
   private readonly cameraFps = new FpsMeter()
   private readonly resizeObserver: ResizeObserver
@@ -109,6 +128,8 @@ export class MirrorEngine {
     this.compositeUniforms = uniformLocations(gl, this.compositeProgram, COMPOSITE_UNIFORMS)
     this.videoTexture = createVideoTexture(gl)
     this.field = new FogField(gl, options.fieldFormat)
+    this.blur = new BlurPyramid(gl)
+    this.drips = new DripSystem(params)
 
     this.resizeObserver = new ResizeObserver(() => this.resize())
     this.resizeObserver.observe(canvas)
@@ -140,6 +161,7 @@ export class MirrorEngine {
     this.stop()
     this.resizeObserver.disconnect()
     this.field.dispose()
+    this.blur.dispose()
     this.gl.deleteTexture(this.videoTexture)
     this.gl.deleteProgram(this.updateProgram)
     this.gl.deleteProgram(this.compositeProgram)
@@ -148,6 +170,8 @@ export class MirrorEngine {
   /** Remplit le miroir de buée (`density` = 1) ou l'efface (`density` = 0). */
   fillFog(density: number): void {
     this.field.fill(density)
+    // Un miroir essuyé n'a plus d'eau pour faire couler des gouttes.
+    if (density === 0) this.drips.clear(this.input)
   }
 
   get stats(): EngineStats {
@@ -158,6 +182,7 @@ export class MirrorEngine {
       videoSize: [this.video.videoWidth, this.video.videoHeight],
       fieldSize: [this.field.width, this.field.height],
       fieldFormat: this.field.format,
+      drips: this.drips.count,
     }
   }
 
@@ -207,7 +232,11 @@ export class MirrorEngine {
     this.resizeField()
     this.uploadVideo()
 
+    // Les gouttes qui coulent tracent leurs traînées dans le bus, comme un doigt ; elles naissent
+    // des tracés et des souffles de la frame.
+    this.drips.update(dt, this.input)
     const { breaths, segments } = this.input.drain()
+    this.drips.observe(segments, breaths, dt)
     this.breathData.fill(0)
     breaths.slice(0, MAX_BREATHS).forEach((b, i) => {
       this.breathData.set([b.x, b.y, params.breathRadius * (b.scale ?? 1), b.intensity], i * 4)
@@ -233,7 +262,8 @@ export class MirrorEngine {
     if (this.hasNewFrame) {
       gl.bindTexture(gl.TEXTURE_2D, this.videoTexture)
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, video)
-      gl.generateMipmap(gl.TEXTURE_2D)
+      // Le flou ne change qu'avec l'image : on le recalcule seulement à chaque nouvelle image.
+      this.blur.run(this.videoTexture, video.videoWidth, video.videoHeight, this.params.blurSpread)
       if ('requestVideoFrameCallback' in video) this.hasNewFrame = false
     }
     this.cover = coverTransform(
@@ -251,7 +281,7 @@ export class MirrorEngine {
     segments.forEach((s, i) => {
       this.segmentData.set([s.a.x, s.a.y, s.b.x, s.b.y], i * 4)
       this.segmentWidths.set(
-        [strokeWidth(s.a.speed, params), strokeWidth(s.b.speed, params)],
+        [s.a.width ?? strokeWidth(s.a.speed, params), s.b.width ?? strokeWidth(s.b.speed, params)],
         i * 2,
       )
     })
@@ -266,15 +296,18 @@ export class MirrorEngine {
     gl.uniform1f(u.uAspect, field.width / field.height)
     gl.uniform1f(u.uTime, time)
     gl.uniform1f(u.uDt, dt)
-    gl.uniform1f(u.uDither, field.format === 'R8' && dt > 0 ? 1 / 255 : 0)
+    gl.uniform1f(u.uDither, field.format === 'RG8' && dt > 0 ? 1 / 255 : 0)
     gl.uniform1f(u.uEvaporation, params.evaporation)
     gl.uniform1f(u.uEvaporationFloor, params.evaporationFloor)
     gl.uniform1f(u.uEvaporationVariation, params.evaporationVariation)
     gl.uniform1f(u.uDiffusion, params.diffusion)
+    gl.uniform1f(u.uRefogTime, params.refogTime)
+    gl.uniform1f(u.uRefogAmount, params.refogAmount)
     gl.uniform1i(u.uBreathCount, Math.min(breathCount, MAX_BREATHS))
     gl.uniform4fv(u.uBreaths, this.breathData)
     gl.uniform1f(u.uBreathRate, params.breathRate)
     gl.uniform1f(u.uBreathSpread, params.breathSpread)
+    gl.uniform1f(u.uBreathWarp, params.breathWarp)
     gl.uniform1i(u.uSegmentCount, segments.length)
     gl.uniform4fv(u.uSegments, this.segmentData)
     gl.uniform2fv(u.uSegmentWidths, this.segmentWidths)
@@ -289,7 +322,7 @@ export class MirrorEngine {
   }
 
   private composite(): void {
-    const { gl, canvas, field, params, video } = this
+    const { gl, canvas, field, params, blur } = this
     const u = this.compositeUniforms
 
     gl.viewport(0, 0, canvas.width, canvas.height)
@@ -300,13 +333,30 @@ export class MirrorEngine {
     gl.activeTexture(gl.TEXTURE1)
     gl.bindTexture(gl.TEXTURE_2D, field.read.texture)
     gl.uniform1i(u.uField, 1)
+    gl.activeTexture(gl.TEXTURE2)
+    gl.bindTexture(gl.TEXTURE_2D, blur.light)
+    gl.uniform1i(u.uBlurLight, 2)
+    gl.activeTexture(gl.TEXTURE3)
+    gl.bindTexture(gl.TEXTURE_2D, blur.heavy)
+    gl.uniform1i(u.uBlurHeavy, 3)
+    gl.uniform2f(u.uFieldTexel, 1 / field.width, 1 / field.height)
     gl.uniform2fv(u.uCoverScale, this.cover.scale)
     gl.uniform2fv(u.uCoverOffset, this.cover.offset)
     gl.uniform1f(u.uAspect, canvas.width / canvas.height)
-    gl.uniform2f(u.uVideoSize, video.videoWidth || 1, video.videoHeight || 1)
-    gl.uniform1f(u.uBlurRadius, params.blurRadius)
     gl.uniform1f(u.uVeilOpacity, params.veilOpacity)
     gl.uniform3f(u.uFogColor, params.fogColor.r, params.fogColor.g, params.fogColor.b)
+    gl.uniform1f(u.uScatter, params.veilScatter)
+    gl.uniform1f(u.uDroplets, params.droplets)
+    gl.uniform1f(u.uDropletScale, params.dropletScale)
+    gl.uniform1f(u.uWetEdge, params.wetEdge)
+    gl.uniform1f(u.uRefraction, params.refraction)
+    gl.uniform1f(u.uGrain, params.grain)
+    gl.uniform1f(u.uMottling, params.mottling)
+    const heads = this.drips.heads()
+    this.dripData.fill(0)
+    heads.forEach((h, i) => this.dripData.set([h.x, h.y, h.radius, 0], i * 4))
+    gl.uniform1i(u.uDripCount, heads.length)
+    gl.uniform4fv(u.uDrips, this.dripData)
     gl.drawArrays(gl.TRIANGLES, 0, 3)
   }
 }

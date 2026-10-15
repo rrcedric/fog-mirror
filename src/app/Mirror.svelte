@@ -135,7 +135,7 @@
           // ?r8 dans l'URL force le format 8 bits du champ, pour tester le repli.
           const forceR8 = new URLSearchParams(location.search).has('r8')
           engine = new MirrorEngine(canvas, video, input, params, {
-            fieldFormat: forceR8 ? 'R8' : undefined,
+            fieldFormat: forceR8 ? 'RG8' : undefined,
           })
         } catch (err) {
           console.error(err)
@@ -143,6 +143,8 @@
           return
         }
         engine.start()
+        // En développement, le moteur est accessible depuis la console (tests, réglages).
+        if (import.meta.env.DEV) Object.assign(window, { __engine: engine })
         scheduler = new TrackingScheduler(video, schedulerParams)
         scheduler.start()
         startFace(engine, scheduler)
